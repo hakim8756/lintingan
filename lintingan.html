@@ -1,0 +1,219 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>hakim-blockchain</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #58a6ff;
+    }
+    #balance {
+      text-align: center;
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+    .exchange-board, .grid {
+      margin: 20px auto;
+      width: 90%;
+      max-width: 1000px;
+    }
+    .exchange-board {
+      background: #161b22;
+      border: 1px solid #30363d;
+      padding: 15px;
+      border-radius: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .transactions-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .transactions-table th, .transactions-table td {
+      padding: 10px;
+      border-bottom: 1px solid #30363d;
+      text-align: left;
+    }
+    .grid {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+    .block {
+      background: #161b22;
+      border: 2px solid #58a6ff;
+      border-radius: 8px;
+      padding: 10px;
+      margin-right: 10px;
+      width: 150px;
+      position: relative;
+      cursor: pointer;
+    }
+    .block:hover {
+      background-color: #21262d;
+    }
+    .block::after {
+      content: '🔗';
+      position: absolute;
+      top: 50%;
+      right: -15px;
+      transform: translateY(-50%);
+    }
+    .block:last-child::after {
+      display: none;
+    }
+    #chart-container {
+      width: 90%;
+      max-width: 1000px;
+      margin: 20px auto;
+    }
+    #block-details {
+      margin: 20px auto;
+      width: 90%;
+      max-width: 1000px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 15px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hakim Blockchain Explorer</h1>
+  <div id="balance"></div>
+
+  <div id="chart-container">
+    <canvas id="priceChart"></canvas>
+  </div>
+
+  <div class="exchange-board">
+    <h2>📈 Order Book - $hakimcoin</h2>
+    <table class="transactions-table">
+      <thead>
+        <tr><th>Time</th><th>Buyer</th><th>Seller</th><th>Amount</th></tr>
+      </thead>
+      <tbody id="exchangeTable"></tbody>
+    </table>
+  </div>
+
+  <div class="grid" id="chain"></div>
+  <div id="block-details"></div>
+
+  <script>
+    let hakimBalance = 0;
+    let price = 1000;
+    let volume24h = 0;
+    const totalSupply = 100_000_000;
+    const chartData = [];
+    const maxChartPoints = 300;
+
+    function updateBalance() {
+      const marketCap = totalSupply * price;
+      document.getElementById('balance').innerText = `MarketCap: $${marketCap.toLocaleString()} | 24h Volume: $${volume24h.toLocaleString()} | Harga: $${price.toFixed(2)} per $hakimcoin`;
+    }
+
+    function updateChart() {
+      if (chartData.length > maxChartPoints) chartData.shift();
+      const last = chartData.length ? chartData[chartData.length - 1] : price;
+      const next = last + (Math.random() - 0.5) * 10;
+      chartData.push(next);
+      price = next;
+      priceChart.data.labels = chartData.map((_, i) => i);
+      priceChart.data.datasets[0].data = chartData;
+      priceChart.update();
+    }
+
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    const priceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: '$hakimcoin Price',
+          data: [],
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88,166,255,0.1)',
+          tension: 0.3
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: false } },
+        plugins: { legend: { labels: { color: '#c9d1d9' } } },
+      }
+    });
+
+    let blockCount = 0;
+    const chainEl = document.getElementById('chain');
+    const exchangeTable = document.getElementById('exchangeTable');
+    const blockDetails = document.getElementById('block-details');
+
+    function randomWallet() {
+      return '0x' + Math.random().toString(16).substr(2, 8) + Math.random().toString(16).substr(2, 8);
+    }
+
+    function getTimeString() {
+      const now = new Date();
+      return now.toLocaleTimeString('en-US', { hour12: false });
+    }
+
+    function addTransactionRow(from, to, amount) {
+      const time = getTimeString();
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${time}</td><td>${from}</td><td>${to}</td><td>$${amount.toFixed(2)}</td>`;
+      exchangeTable.insertBefore(row, exchangeTable.firstChild);
+      if (exchangeTable.children.length > 20) exchangeTable.removeChild(exchangeTable.lastChild);
+    }
+
+    function mineBlock() {
+      hakimBalance += 5;
+      const txCount = Math.floor(Math.random() * 8000) + 2000;
+      let blockTotal = 0;
+      const prevHash = Math.random().toString(36).substring(2, 10);
+      const blockData = [];
+
+      for (let i = 0; i < txCount; i++) {
+        const buyer = randomWallet();
+        const seller = randomWallet();
+        const amount = Math.random() * 100 + 1;
+        blockTotal += amount;
+        volume24h += amount;
+        blockData.push({ buyer, seller, amount });
+        if (i < 50) addTransactionRow(buyer, seller, amount);
+      }
+
+      const blockIndex = ++blockCount;
+      const blockDiv = document.createElement('div');
+      blockDiv.className = 'block';
+      blockDiv.innerHTML = `Block #${blockIndex}`;
+      blockDiv.onclick = () => {
+        blockDetails.style.display = 'block';
+        blockDetails.innerHTML = `
+          <h2>Block #${blockIndex}</h2>
+          <p>Jumlah Transaksi: ${txCount}</p>
+          <p>Total Transaksi: $${blockTotal.toFixed(2)}</p>
+          <p>Prev Hash: ${prevHash}</p>
+        `;
+      };
+      chainEl.appendChild(blockDiv);
+      updateBalance();
+    }
+
+    setInterval(mineBlock, 120000);
+    setInterval(updateChart, 60000);
+    updateBalance();
+    updateChart();
+  </script>
+</body>
+</html>
